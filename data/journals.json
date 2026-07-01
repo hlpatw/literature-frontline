@@ -1,0 +1,72 @@
+[
+  {
+    "id": "child-development",
+    "name": "Child Development",
+    "publisher": "SRCD / Wiley",
+    "field": "developmental-psychology",
+    "priority": "flagship"
+  },
+  {
+    "id": "developmental-science",
+    "name": "Developmental Science",
+    "publisher": "Wiley",
+    "field": "developmental-cognitive-science",
+    "priority": "flagship"
+  },
+  {
+    "id": "developmental-psychology",
+    "name": "Developmental Psychology",
+    "publisher": "APA",
+    "field": "developmental-psychology",
+    "priority": "flagship"
+  },
+  {
+    "id": "jecp",
+    "name": "Journal of Experimental Child Psychology",
+    "publisher": "Elsevier",
+    "field": "experimental-child-psychology",
+    "priority": "core"
+  },
+  {
+    "id": "infancy",
+    "name": "Infancy",
+    "publisher": "ICIS / Wiley",
+    "field": "infant-development",
+    "priority": "core"
+  },
+  {
+    "id": "journal-of-child-language",
+    "name": "Journal of Child Language",
+    "publisher": "Cambridge University Press",
+    "field": "language-development",
+    "priority": "flagship"
+  },
+  {
+    "id": "language-learning-development",
+    "name": "Language Learning and Development",
+    "publisher": "Taylor & Francis",
+    "field": "language-development",
+    "priority": "core"
+  },
+  {
+    "id": "journal-of-memory-and-language",
+    "name": "Journal of Memory and Language",
+    "publisher": "Elsevier",
+    "field": "psycholinguistics",
+    "priority": "flagship"
+  },
+  {
+    "id": "applied-psycholinguistics",
+    "name": "Applied Psycholinguistics",
+    "publisher": "Cambridge University Press",
+    "field": "applied-psycholinguistics",
+    "priority": "core"
+  },
+  {
+    "id": "first-language",
+    "name": "First Language",
+    "publisher": "SAGE",
+    "field": "language-development",
+    "priority": "core"
+  }
+]

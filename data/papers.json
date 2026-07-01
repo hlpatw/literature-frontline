@@ -1,0 +1,132 @@
+[
+  {
+    "id": "doi-10.1111-infa.70100",
+    "journalId": "infancy",
+    "journal": "Infancy",
+    "title": "Issue Information",
+    "authors": [],
+    "doi": "10.1111/infa.70100",
+    "url": "https://doi.org/10.1111/infa.70100",
+    "publishedDate": "2026-06-25",
+    "topics": [
+      "Infancy",
+      "期刊信息",
+      "Issue Information"
+    ],
+    "ageGroup": "摘要未说明",
+    "paradigm": "摘要未说明",
+    "methods": "摘要未说明",
+    "researchQuestionZh": "摘要未提供，无法确定研究问题。",
+    "researchQuestionEn": "No abstract is available to determine the research question.",
+    "abstractZh": "本文无摘要。",
+    "abstractEn": "No abstract is available for this article.",
+    "keyFindingsZh": "摘要未提供，无法确定核心发现。",
+    "keyFindingsEn": "No abstract is available to determine the key findings.",
+    "status": "summarized",
+    "source": "crossref+model"
+  },
+  {
+    "id": "doi-10.1111-infa.70103",
+    "journalId": "infancy",
+    "journal": "Infancy",
+    "title": "Early and Chronic Postnatal Depression, Maternal Sensitivity to Non‐Distress and Infant Neurodevelopmental Outcomes in an Indian Birth Cohort",
+    "authors": [
+      "Matthew Bluett‐Duncan",
+      "Thomas Kishore",
+      "Veena Satyanarayana",
+      "Supraja TA",
+      "Laura Bozicevic",
+      "Chaithra Holla",
+      "Nicky Wright",
+      "Ellie Preece",
+      "Andrew Pickles",
+      "Prabha Chandra",
+      "Helen Sharp"
+    ],
+    "doi": "10.1111/infa.70103",
+    "url": "https://doi.org/10.1111/infa.70103",
+    "publishedDate": "2026-06-25",
+    "topics": [
+      "产后抑郁",
+      "maternal sensitivity",
+      "婴儿神经发育",
+      "infant neurodevelopment",
+      "性别差异",
+      "sex-specific effects",
+      "纵向研究",
+      "longitudinal cohort",
+      "印度",
+      "India",
+      "贝利量表",
+      "Bayley Scales"
+    ],
+    "ageGroup": "婴儿（从出生至24个月）",
+    "paradigm": "前瞻性纵向队列研究，包括半结构化游戏观察和贝利婴儿发展量表评估",
+    "methods": "纵向队列研究；使用爱丁堡产后抑郁量表评估母亲抑郁症状；通过半结构化游戏观察编码母亲对非痛苦信号的敏感性；使用贝利婴儿发展量表评估婴儿神经发育；进行回归分析和探索性分析",
+    "researchQuestionZh": "在印度背景下，母亲产后抑郁、对非痛苦信号的敏感性是否与婴儿神经发育相关，以及敏感性是否能缓冲产后抑郁的影响？",
+    "researchQuestionEn": "Are findings from High-Income Countries regarding associations between maternal postnatal depression, maternal sensitivity to non-distress, infant neurodevelopmental outcomes, and the potential buffering role of sensitivity also present in India?",
+    "abstractZh": "本研究基于印度班加罗尔儿童健康与发展队列，探讨母亲产后抑郁及对非痛苦信号的敏感性与婴儿24个月时神经发育的关系。结果显示，在整体样本中，早期或慢性产后抑郁及母亲敏感性均与婴儿认知或语言发育无关。但在男孩中，较高的母亲敏感性与更好的语言发育相关，且敏感性未显示出对产后抑郁负面影响的缓冲作用。探索性分析还发现胎次、出生体重等因素与神经发育存在性别特异性关联。",
+    "abstractEn": "This study examined whether associations between maternal postnatal depression (PND), maternal sensitivity to non-distress (SND), and infant neurodevelopment, including the potential buffering role of SND, found in High-Income Countries are present in an Indian birth cohort. In the whole sample, early PND, chronic PND, and SND were not associated with infant cognitive or language development at 24 months. However, in boys, increased maternal SND was associated with improved language development. SND did not moderate associations between PND and outcomes.",
+    "keyFindingsZh": "在整体样本中，母亲早期或慢性产后抑郁以及对非痛苦信号的敏感性与婴儿24个月时的认知或语言发育均无显著关联。然而，在男孩中，母亲较高的敏感性与更好的语言发育相关。母亲敏感性并未缓冲产后抑郁对婴儿发育的影响。探索性分析发现胎次、出生体重等因素与神经发育存在性别特异性关联。",
+    "keyFindingsEn": "Early PND, chronic PND, and maternal SND were not associated with infant cognitive or language development in the whole sample. However, in boys, increased maternal SND was associated with improved language development. SND did not moderate associations between maternal PND and outcomes. Exploratory analyses revealed small but significant sex-specific associations between factors like parity, birthweight, and neurodevelopment.",
+    "status": "summarized",
+    "source": "crossref+model"
+  },
+  {
+    "id": "demo-2026-06-18-jcl",
+    "journalId": "journal-of-child-language",
+    "journal": "Journal of Child Language",
+    "title": "Demonstration record: pragmatic cue use in early word learning",
+    "authors": [
+      "Example Author",
+      "Demo Researcher"
+    ],
+    "doi": "10.0000/demo.jcl.2026.001",
+    "url": "https://doi.org/10.0000/demo.jcl.2026.001",
+    "publishedDate": "2026-06-18",
+    "topics": [
+      "儿童语言发展",
+      "词汇学习",
+      "语用线索"
+    ],
+    "ageGroup": "3-5岁儿童",
+    "paradigm": "新词学习任务；指称选择；眼动或反应选择",
+    "methods": "混合效应逻辑回归；被试与项目随机效应；模型比较",
+    "researchQuestionZh": "儿童是否会利用说话者意图和语境线索来限制新词指称范围？",
+    "researchQuestionEn": "Do children use speaker intention and contextual cues to constrain novel word meanings?",
+    "abstractZh": "这是一条演示记录，用于展示 dashboard 的字段结构。真实工作流会从期刊元数据和摘要中提取问题、样本、任务、方法和发现。",
+    "abstractEn": "This demonstration record shows the dashboard schema. In the live workflow, metadata and abstracts are converted into structured bilingual summaries.",
+    "keyFindingsZh": "演示结果：语境与说话者线索可被整理为可检索标签，并进入月度报告。",
+    "keyFindingsEn": "Demo finding: contextual and speaker cues can be converted into searchable tags and monthly reports.",
+    "status": "demo",
+    "source": "manual"
+  },
+  {
+    "id": "demo-2026-06-05-devsci",
+    "journalId": "developmental-science",
+    "journal": "Developmental Science",
+    "title": "Demonstration record: semantic learning and cognitive control in childhood",
+    "authors": [
+      "Sample Scholar"
+    ],
+    "doi": "10.0000/demo.devsci.2026.002",
+    "url": "https://doi.org/10.0000/demo.devsci.2026.002",
+    "publishedDate": "2026-06-05",
+    "topics": [
+      "儿童认知发展",
+      "语义学习",
+      "执行功能"
+    ],
+    "ageGroup": "6-8岁儿童",
+    "paradigm": "语义分类任务；冲突控制任务",
+    "methods": "线性混合模型；贝叶斯稳健性检验",
+    "researchQuestionZh": "儿童语义类别学习是否与执行功能发展存在关联？",
+    "researchQuestionEn": "Is children's semantic category learning associated with the development of executive function?",
+    "abstractZh": "这是一条演示记录，用于展示按期刊和月份交叉浏览的效果。",
+    "abstractEn": "This demonstration record illustrates cross-filtering by journal and month.",
+    "keyFindingsZh": "演示结果：系统可把发展心理学与心理语言学主题合并到同一研究雷达中。",
+    "keyFindingsEn": "Demo finding: the system can place developmental psychology and psycholinguistics in one research radar.",
+    "status": "demo",
+    "source": "manual"
+  }
+]

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Literature Radar Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">LR</span>
+          <div>
+            <h1>Literature Radar</h1>
+            <p>儿童语言与认知发展</p>
+          </div>
+        </div>
+
+        <section class="panel">
+          <h2>筛选</h2>
+          <label>
+            关键词
+            <input id="searchInput" type="search" placeholder="词汇学习 / semantic / LMM">
+          </label>
+          <label>
+            期刊
+            <select id="journalFilter"></select>
+          </label>
+          <label>
+            年份
+            <select id="yearFilter"></select>
+          </label>
+          <label>
+            月份
+            <select id="monthFilter"></select>
+          </label>
+        </section>
+
+        <section class="panel">
+          <h2>工作流</h2>
+          <button id="updateButton" class="primary-button" type="button">手动更新</button>
+          <button id="exportJsonButton" type="button">导出 JSON</button>
+          <button id="exportMarkdownButton" type="button">导出 Markdown</button>
+          <p id="updateStatus" class="status-text">准备就绪。</p>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Private Dashboard</p>
+            <h2>期刊前沿追踪</h2>
+          </div>
+          <div class="stats" id="stats"></div>
+        </header>
+
+        <section class="timeline-band">
+          <div class="section-title">
+            <h3>日期层级</h3>
+            <p>从年份到月份，再到具体发布日期。</p>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </section>
+
+        <section class="content-grid">
+          <div class="paper-list-wrap">
+            <div class="section-title">
+              <h3>文献列表</h3>
+              <p id="resultCount"></p>
+            </div>
+            <div id="paperList" class="paper-list"></div>
+          </div>
+
+          <article id="paperDetail" class="detail-panel"></article>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
