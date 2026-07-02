@@ -2,7 +2,8 @@
 // 所有逻辑内联，避免模块导入问题
 
 export default async function handler(request, response) {
-  if (request.method !== "POST") {
+  // 允许 GET 方法进行测试
+  if (request.method !== "POST" && request.method !== "GET") {
     return response.status(405).json({ message: "Use POST to trigger a manual update." });
   }
 
