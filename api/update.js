@@ -1,107 +1,171 @@
 // Vercel API Function for literature radar update
-// 使用统一的 Crossref 客户端模块
-
-import { CrossrefClient } from "../lib/crossref-client.js";
-
-// 期刊配置（包含ISSN）
-const JOURNALS_CONFIG = [
-  { id: "child-development", name: "Child Development", issn: ["0009-3920", "1467-8624"] },
-  { id: "developmental-science", name: "Developmental Science", issn: ["1363-755X", "1467-7684"] },
-  { id: "developmental-psychology", name: "Developmental Psychology", issn: ["0012-1649", "1939-0599"] },
-  { id: "jecp", name: "Journal of Experimental Child Psychology", issn: ["0022-0965", "1096-0457"] },
-  { id: "infancy", name: "Infancy", issn: ["1532-7078"] },
-  { id: "journal-of-child-language", name: "Journal of Child Language", issn: ["0305-0009"] },
-  { id: "language-learning-development", name: "Language Learning and Development", issn: ["1547-5441", "1547-3341"] },
-  { id: "journal-of-memory-and-language", name: "Journal of Memory and Language", issn: ["0749-596X", "1096-0821"] },
-  { id: "applied-psycholinguistics", name: "Applied Psycholinguistics", issn: ["0142-7164", "1469-1817"] },
-  { id: "first-language", name: "First Language", issn: ["0142-7237"] }
-];
+// 独立实现，不依赖外部模块
 
 export default async function handler(request, response) {
-  if (request.method !== "POST") {
-    response.status(405).json({ message: "Use POST to trigger a manual update." });
-    return;
+  // 允许 GET 方法进行测试
+  if (request.method !== "POST" && request.method !== "GET") {
+    return response.status(405).json({ message: "Use POST to trigger a manual update." });
   }
 
   try {
-    const from = new Date();
+    console.log("[Update] Starting update...");
+
     const daysLookback = Number(process.env.CROSSREF_DAYS_LOOKBACK || 180);
+    const rowsPerJournal = Number(process.env.CROSSREF_ROWS_PER_JOURNAL || 20);
+    const from = new Date();
     from.setDate(from.getDate() - daysLookback);
+    const fromDate = from.toISOString().slice(0, 10);
 
-    // 使用统一的 Crossref 客户端
-    const client = new CrossrefClient({
-      useIssn: process.env.CROSSREF_USE_ISSN !== "false",
-      hasAbstract: process.env.CROSSREF_HAS_ABSTRACT !== "false",
-      rows: Number(process.env.CROSSREF_ROWS_PER_JOURNAL || 100),
-      daysLookback
-    });
+    // 期刊配置（内置ISSN）
+    const JOURNALS = [
+      { id: "child-development", name: "Child Development", issn: ["0009-3920", "1467-8624"] },
+      { id: "developmental-science", name: "Developmental Science", issn: ["1363-755X", "1467-7684"] },
+      { id: "developmental-psychology", name: "Developmental Psychology", issn: ["0012-1649", "1939-0599"] },
+      { id: "jecp", name: "Journal of Experimental Child Psychology", issn: ["0022-0965", "1096-0457"] },
+      { id: "infancy", name: "Infancy", issn: ["1532-7078"] },
+      { id: "journal-of-child-language", name: "Journal of Child Language", issn: ["0305-0009"] },
+      { id: "language-learning-development", name: "Language Learning and Development", issn: ["1547-5441", "1547-3341"] },
+      { id: "journal-of-memory-and-language", name: "Journal of Memory and Language", issn: ["0749-596X", "1096-0821"] },
+      { id: "applied-psycholinguistics", name: "Applied Psycholinguistics", issn: ["0142-7164", "1469-1817"] },
+      { id: "first-language", name: "First Language", issn: ["0142-7237"] }
+    ];
 
-    // 读取期刊配置（包含ISSN）
-    const journalsConfig = JOURNALS_CONFIG;
-    console.log("[API] Loaded journals config:", journalsConfig.length, "journals");
+    // 排除规则
+    const EXCLUDE_PATTERNS = [
+      "issue information", "table of contents", "editorial board",
+      "announcement", "book review", "corrigendum", "erratum",
+      "retraction", "editorial", "preface", "foreword"
+    ];
+    const EXCLUDE_SUBTYPES = ["editorial", "letter", "news", "book-review", "issue-information"];
 
-    const candidates = await client.fetchPapers(journalsConfig);
-    console.log(`[Update] Found ${candidates.length} candidates from Crossref`);
+    // 清除HTML标签
+    function stripTags(value) {
+      return String(value).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+    }
 
-    const summarized = await summarizePapers(candidates);
-    const saveResult = await saveToGitHub(summarized);
+    // 推断主题标签
+    function inferTopics(title, abstract) {
+      const text = `${title} ${abstract}`.toLowerCase();
+      const topics = [];
 
-    response.status(200).json({
-      message: saveResult.saved
-        ? `更新完成：新增/合并 ${summarized.length} 条候选记录（来自近 ${daysLookback} 天），并已写回 GitHub。`
-        : `更新完成：返回 ${summarized.length} 条候选记录。${saveResult.reason}`,
-      papers: summarized,
-      saved: saveResult.saved,
-      saveResult,
-      debug: {
-        candidatesFound: candidates.length,
-        timeRange: `${daysLookback} days`,
-        useIssn: client.useIssn,
-        hasAbstract: client.hasAbstract
+      if (/language|word|vocabulary|syntax|semantic|pragmatic|speech/.test(text)) topics.push("儿童语言发展");
+      if (/vocabulary|word learning|lexical/.test(text)) topics.push("词汇学习");
+      if (/cognitive|memory|attention|executive/.test(text)) topics.push("儿童认知发展");
+      if (/infant|baby|babie/.test(text)) topics.push("婴儿发展");
+      if (/social|emotion|attachment/.test(text)) topics.push("社会性发展");
+
+      return topics.length ? topics : ["待分类"];
+    }
+
+    // 获取单个期刊的文献
+    async function fetchJournal(journal) {
+      const url = new URL("https://api.crossref.org/works");
+
+      // 使用期刊名称查询
+      url.searchParams.set("query", journal.name);
+      url.searchParams.set("rows", String(rowsPerJournal));
+
+      console.log(`[Crossref] Fetching ${journal.name}...`);
+
+      let result = await fetch(url);
+
+      // 如果遇到 429 错误，等待后重试
+      if (result.status === 429) {
+        console.warn(`[Crossref] ${journal.name}: Rate limited, waiting 5 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        result = await fetch(url);
       }
-    });
-  } catch (error) {
-    console.error("[Update] Error:", error);
-    response.status(500).json({
-      message: "更新函数运行失败。",
-      error: error.message,
-      hint: "请检查环境变量配置。"
-    });
-  }
-}
 
-async function fetchJson(path) {
-  const response = await fetch(path);
-  if (!response.ok) {
-    throw new Error(`Cannot load ${path}`);
-  }
-  return response.json();
-}
+      if (!result.ok) {
+        console.error(`[Crossref] ${journal.name}: HTTP ${result.status}`);
+        return { journalName: journal.name, error: `HTTP ${result.status}`, count: 0, items: [] };
+      }
 
-async function summarizePapers(papers) {
-  if (!process.env.MODEL_API_KEY || !process.env.MODEL_BASE_URL) {
-    return papers.map((paper) => ({
-      ...paper,
-      status: "candidate",
-      modelNote: "MODEL_API_KEY or MODEL_BASE_URL is not configured."
-    }));
-  }
+      const payload = await result.json();
+      const items = payload.message?.items ?? [];
+      console.log(`[Crossref] ${journal.name}: Got ${items.length} items`);
 
-  const limit = Number(process.env.UPDATE_SUMMARY_LIMIT ?? 20);
-  const selected = papers.slice(0, limit);
-  const rest = papers.slice(limit);
-  const summarized = [];
+      // 过滤非研究文章并转换格式
+      const validItems = items.filter(item => {
+        const subtype = item.subtype?.toLowerCase();
+        if (subtype && EXCLUDE_SUBTYPES.includes(subtype)) return false;
 
-  for (const paper of selected) {
-    summarized.push(await summarizePaper(paper));
-  }
+        const title = (item.title?.[0] ?? "").toLowerCase();
+        for (const pattern of EXCLUDE_PATTERNS) {
+          if (title.includes(pattern)) return false;
+        }
+        return true;
+      }).map(item => {
+        const dateParts = item.published?.["date-parts"]?.[0] ?? item["published-print"]?.["date-parts"]?.[0] ?? [];
+        const year = dateParts[0] ?? new Date().getFullYear();
+        const month = String(dateParts[1] ?? 1).padStart(2, "0");
+        const day = String(dateParts[2] ?? 1).padStart(2, "0");
+        const publishedDate = `${year}-${month}-${day}`;
 
-  return [...summarized, ...rest];
-}
+        return {
+          id: item.DOI ? `doi-${item.DOI.toLowerCase().replace(/\//g, "-")}` : `crossref-${item.URL}`,
+          journalId: journal.id,
+          journal: journal.name,
+          title: stripTags(item.title?.[0] ?? "Untitled"),
+          authors: (item.author ?? []).map(a => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean),
+          doi: item.DOI ?? "",
+          url: item.URL ?? `https://doi.org/${item.DOI}`,
+          publishedDate,
+          topics: inferTopics(item.title?.[0] ?? "", item.abstract ?? ""),
+          abstractEn: stripTags(item.abstract ?? "Abstract not available."),
+          ageGroup: "待模型提取 / Pending model extraction",
+          paradigm: "待模型提取 / Pending model extraction",
+          methods: "待模型提取 / Pending model extraction",
+          researchQuestionZh: "待模型根据摘要提取。",
+          researchQuestionEn: "Pending extraction from the abstract.",
+          abstractZh: "待接入国内模型生成中文精简摘要。",
+          keyFindingsZh: "待模型提取核心发现。",
+          keyFindingsEn: "Pending key-finding extraction.",
+          status: "candidate",
+          source: "crossref"
+        };
+      });
 
-async function summarizePaper(paper) {
-  const prompt = `
-你是心理语言学和儿童认知发展方向的博士研究助理。请基于下面的期刊论文元数据和摘要，输出严格 JSON，不要 Markdown，不要解释。
+      console.log(`[Crossref] ${journal.name}: ${validItems.length} valid items after filtering`);
+
+      return { journalName: journal.name, count: validItems.length, items: validItems };
+    }
+
+    // 串行获取所有期刊以避免速率限制
+    const results = [];
+    for (const journal of JOURNALS) {
+      const result = await fetchJournal(journal);
+      results.push(result);
+      // 每个请求之间延迟 3 秒
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    const batches = results.filter(r => !r.error).map(r => r.items);
+    const errors = results.filter(r => r.error);
+
+    // 去重
+    const seen = new Set();
+    let papers = batches.flat().filter(p => {
+      const key = p.doi || p.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => b.publishedDate.localeCompare(a.publishedDate));
+
+    console.log(`[Update] Total unique papers: ${papers.length}`);
+    if (errors.length > 0) {
+      console.error(`[Update] Errors: ${errors.map(e => `${e.journalName}: ${e.error}`).join(", ")}`);
+    }
+
+    // 调用模型生成摘要
+    let summarized = [];
+    if (process.env.MODEL_API_KEY && process.env.MODEL_BASE_URL) {
+      const limit = Number(process.env.UPDATE_SUMMARY_LIMIT ?? 10);
+      const selected = papers.slice(0, limit);
+
+      for (const paper of selected) {
+        try {
+          const prompt = `你是心理语言学和儿童认知发展方向的博士研究助理。请基于下面的期刊论文元数据和摘要，输出严格 JSON，不要 Markdown。
 
 字段：
 {
@@ -126,88 +190,112 @@ DOI: ${paper.doi}
 Abstract: ${paper.abstractEn}
 `;
 
-  try {
-    const payload = await callModel(prompt);
-    return {
-      ...paper,
-      ...payload,
-      topics: Array.isArray(payload.topics) && payload.topics.length ? payload.topics : paper.topics,
-      status: "summarized",
-      source: `${paper.source}+model`
-    };
+          const modelResponse = await fetch(`${process.env.MODEL_BASE_URL}/v1/chat/completions`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${process.env.MODEL_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: process.env.MODEL_NAME || "deepseek-chat",
+              temperature: 0.2,
+              response_format: { type: "json_object" },
+              messages: [
+                { role: "system", content: "You extract structured fields from academic article metadata. Return valid JSON only." },
+                { role: "user", content: prompt }
+              ]
+            })
+          });
+
+          if (modelResponse.ok) {
+            const data = await modelResponse.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) {
+              try {
+                const parsed = JSON.parse(content.replace(/```json\s*/i, "").replace(/```/g, "").trim());
+                summarized.push({
+                  ...paper,
+                  ...parsed,
+                  topics: Array.isArray(parsed.topics) && parsed.topics.length ? parsed.topics : paper.topics,
+                  status: "summarized",
+                  source: `${paper.source}+model`
+                });
+              } catch (e) {
+                console.error("[Model] JSON parse error:", e.message);
+                summarized.push({ ...paper, status: "candidate", modelNote: "JSON parse failed" });
+                // 模型调用之间也需要延迟
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+          } else {
+            summarized.push({ ...paper, status: "candidate", modelNote: `HTTP ${modelResponse.status}` });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (e) {
+          console.error("[Model] Error:", e.message);
+          summarized.push({ ...paper, status: "candidate", modelNote: e.message });
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      const rest = papers.slice(limit);
+      papers = [...summarized, ...rest.map(p => ({ ...p, status: "candidate" }))];
+    }
+
+    // 保存到 GitHub
+    let saveResult = { saved: false, reason: "未配置保存功能" };
+    if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPO) {
+      try {
+        saveResult = await saveToGitHub(papers);
+      } catch (e) {
+        console.error("[GitHub] Save error:", e.message);
+        saveResult = { saved: false, reason: e.message };
+      }
+    }
+
+    return response.status(200).json({
+      message: saveResult.saved
+        ? `更新完成：返回 ${papers.length} 条记录（其中 ${summarized.length} 条已生成摘要），并已保存到 GitHub。`
+        : `更新完成：返回 ${papers.length} 条记录（其中 ${summarized.length} 条已生成摘要）。`,
+      papers,
+      saved: saveResult.saved,
+      saveResult,
+      debug: {
+        candidatesFound: papers.length,
+        summarizedCount: summarized.length,
+        daysLookback,
+        fromDate,
+        journalErrors: errors.map(e => ({ name: e.journalName, error: e.error }))
+      }
+    });
+
   } catch (error) {
-    return {
-      ...paper,
-      status: "candidate",
-      modelNote: `Model summarization failed: ${error.message}`
-    };
+    console.error("[Update] Error:", error);
+    return response.status(500).json({
+      message: "更新函数运行失败。",
+      error: error.message,
+      stack: error.stack
+    });
   }
 }
 
-async function callModel(prompt) {
-  const baseUrl = process.env.MODEL_BASE_URL.replace(/\/$/, "");
-  const model = process.env.MODEL_NAME || "deepseek-chat";
-  const body = {
-    model,
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: "You extract structured fields from academic article metadata. Return valid JSON only." },
-      { role: "user", content: prompt }
-    ]
-  };
-  let result = await postModelRequest(baseUrl, body);
-
-  if (!result.ok && result.status === 400) {
-    const fallbackBody = { ...body };
-    delete fallbackBody.response_format;
-    result = await postModelRequest(baseUrl, fallbackBody);
-  }
-
-  if (!result.ok) {
-    throw new Error(`HTTP ${result.status}`);
-  }
-
-  const data = await result.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("Empty model response");
-  }
-  return JSON.parse(extractJson(content));
-}
-
-async function postModelRequest(baseUrl, body) {
-  return fetch(`${baseUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${process.env.MODEL_API_KEY}`
-    },
-    body: JSON.stringify(body)
-  });
-}
-
-function extractJson(content) {
-  const trimmed = content.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
-  const first = trimmed.indexOf("{");
-  const last = trimmed.lastIndexOf("}");
-  return first >= 0 && last >= first ? trimmed.slice(first, last + 1) : trimmed;
-}
-
+// GitHub 相关函数
 async function saveToGitHub(newPapers) {
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPO;
   const branch = process.env.GITHUB_BRANCH || "main";
 
-  if (!token || !repo) {
-    return { saved: false, reason: "未配置 GITHUB_TOKEN / GITHUB_REPO，因此未自动写回。" };
-  }
-
+  // 获取现有文件
   const currentFile = await getGitHubFile(repo, "data/papers.json", branch, token);
   const existing = currentFile.content ? JSON.parse(currentFile.content) : [];
+
+  // 合并论文
   const merged = mergeByDoi(existing, newPapers);
+
+  // 保存到 GitHub
   await putGitHubFile(repo, "data/papers.json", JSON.stringify(merged, null, 2) + "\n", currentFile.sha, branch, token, "Update literature radar papers");
 
+  // 生成月度报告
   const reports = makeMonthlyReports(merged);
   for (const [path, content] of reports) {
     const currentReport = await getGitHubFile(repo, path, branch, token).catch(() => ({ sha: undefined, content: "" }));
