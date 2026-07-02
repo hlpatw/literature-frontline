@@ -11,7 +11,7 @@ export default async function handler(request, response) {
     console.log("[Update] Starting update...");
 
     const daysLookback = Number(process.env.CROSSREF_DAYS_LOOKBACK || 180);
-    const rowsPerJournal = Number(process.env.CROSSREF_ROWS_PER_JOURNAL || 20);
+    const rowsPerJournal = Number(process.env.CROSSREF_ROWS_PER_JOURNAL || 10);
     const from = new Date();
     from.setDate(from.getDate() - daysLookback);
     const fromDate = from.toISOString().slice(0, 10);
@@ -71,8 +71,8 @@ export default async function handler(request, response) {
 
       // 如果遇到 429 错误，等待后重试
       if (result.status === 429) {
-        console.warn(`[Crossref] ${journal.name}: Rate limited, waiting 5 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.warn(`[Crossref] ${journal.name}: Rate limited, waiting 2 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
         result = await fetch(url);
       }
 
@@ -131,13 +131,13 @@ export default async function handler(request, response) {
       return { journalName: journal.name, count: validItems.length, items: validItems };
     }
 
-    // 串行获取所有期刊以避免速率限制
+    // 串行获取所有期刊以避免速率限制（减少延迟）
     const results = [];
     for (const journal of JOURNALS) {
       const result = await fetchJournal(journal);
       results.push(result);
-      // 每个请求之间延迟 3 秒
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // 每个请求之间延迟 1 秒
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     const batches = results.filter(r => !r.error).map(r => r.items);
@@ -157,10 +157,10 @@ export default async function handler(request, response) {
       console.error(`[Update] Errors: ${errors.map(e => `${e.journalName}: ${e.error}`).join(", ")}`);
     }
 
-    // 调用模型生成摘要
+    // 调用模型生成摘要（限制数量以避免超时）
     let summarized = [];
     if (process.env.MODEL_API_KEY && process.env.MODEL_BASE_URL) {
-      const limit = Number(process.env.UPDATE_SUMMARY_LIMIT ?? 10);
+      const limit = Number(process.env.UPDATE_SUMMARY_LIMIT ?? 5);
       const selected = papers.slice(0, limit);
 
       for (const paper of selected) {
@@ -223,18 +223,14 @@ Abstract: ${paper.abstractEn}
               } catch (e) {
                 console.error("[Model] JSON parse error:", e.message);
                 summarized.push({ ...paper, status: "candidate", modelNote: "JSON parse failed" });
-                // 模型调用之间也需要延迟
-                await new Promise(resolve => setTimeout(resolve, 1000));
               }
             }
           } else {
             summarized.push({ ...paper, status: "candidate", modelNote: `HTTP ${modelResponse.status}` });
-            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         } catch (e) {
           console.error("[Model] Error:", e.message);
           summarized.push({ ...paper, status: "candidate", modelNote: e.message });
-          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
