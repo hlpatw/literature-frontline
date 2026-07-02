@@ -56,11 +56,27 @@ export default async function handler(request, response) {
     async function fetchJournal(journal) {
       const url = new URL("https://api.crossref.org/works");
 
-      // 使用期刊名称查询
-      url.searchParams.set("query", journal.name);
-      url.searchParams.set("rows", String(rowsPerJournal));
+      // 使用 ISSN 精确过滤（如果有）
+      if (journal.issn && journal.issn.length > 0) {
+        // 使用 filter 参数进行 ISSN 精确匹配
+        // Crossref 支持 ISSN:XXXX-XXXX 格式
+        const filters = [`from-pub-date:${fromDate}`];
+        journal.issn.forEach(issn => {
+          filters.push(`issn:${issn}`);
+        });
+        url.searchParams.set("filter", filters.join(","));
+      } else {
+        // 降级到期刊名称查询
+        url.searchParams.set("query", journal.name);
+        url.searchParams.set("filter", `from-pub-date:${fromDate}`);
+      }
 
-      console.log(`[Crossref] Fetching ${journal.name}...`);
+      url.searchParams.set("rows", String(rowsPerJournal));
+      url.searchParams.set("sort", "published");
+      url.searchParams.set("order", "desc");
+
+      console.log(`[Crossref] Fetching ${journal.name} with ISSN filter...`);
+      console.log(`[Crossref] URL: ${url}`);
 
       let result = await fetch(url);
 
@@ -89,6 +105,22 @@ export default async function handler(request, response) {
         for (const pattern of EXCLUDE_PATTERNS) {
           if (title.includes(pattern)) return false;
         }
+
+        // 额外验证：检查 container-title 是否匹配目标期刊
+        const containerTitles = item["container-title"] ?? [];
+        const journalNameLower = journal.name.toLowerCase();
+        const matchesContainer = containerTitles.some(ct =>
+          ct.toLowerCase() === journalNameLower ||
+          ct.toLowerCase().includes(journalNameLower.split(/\s+/)[0])
+        );
+
+        // 如果使用 ISSN 过滤但容器标题完全不匹配，跳过
+        if (journal.issn && journal.issn.length > 0 && !matchesContainer) {
+          // 记录但不完全排除，因为有些期刊可能有多个名称变体
+          console.log(`[Crossref] ${journal.name}: Skipping item with container-title: ${containerTitles.join(', ')}`);
+          return false;
+        }
+
         return true;
       }).map(item => {
         const dateParts = item.published?.["date-parts"]?.[0] ?? item["published-print"]?.["date-parts"]?.[0] ?? [];
