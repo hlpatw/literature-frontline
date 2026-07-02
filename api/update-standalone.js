@@ -51,8 +51,8 @@ export default async function handler(request, response) {
 
       // 如果遇到 429 错误，等待后重试
       if (result.status === 429) {
-        console.warn(`[Crossref] ${journal.name}: Rate limited, waiting 3 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.warn(`[Crossref] ${journal.name}: Rate limited, waiting 5 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
         result = await fetch(url);
       }
 
@@ -109,8 +109,8 @@ export default async function handler(request, response) {
     for (const journal of JOURNALS) {
       const result = await fetchJournal(journal);
       results.push(result);
-      // 每个请求之间延迟 1 秒
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 每个请求之间延迟 3 秒
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
     const batches = results.filter(r => !r.error).map(r => r.items);
     const errors = results.filter(r => r.error);
