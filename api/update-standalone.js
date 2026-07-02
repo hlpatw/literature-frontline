@@ -40,14 +40,10 @@ export default async function handler(request, response) {
     async function fetchJournal(journal) {
       const url = new URL("https://api.crossref.org/works");
 
-      // 使用ISSN精确匹配
-      if (journal.issn && journal.issn.length > 0) {
-        journal.issn.forEach(issn => url.searchParams.append("issn", issn));
-      } else {
-        url.searchParams.set("query.container-title", journal.name);
-      }
+      // 先用期刊名称匹配（ISSN 方式可能有问题）
+      url.searchParams.set("query.container-title", journal.name);
 
-      url.searchParams.set("filter", `from-pub-date:${fromDate},type:journal-article,has-abstract:true`);
+      url.searchParams.set("filter", `from-pub-date:${fromDate},type:journal-article`);
       url.searchParams.set("sort", "published");
       url.searchParams.set("order", "desc");
       url.searchParams.set("rows", "20");
