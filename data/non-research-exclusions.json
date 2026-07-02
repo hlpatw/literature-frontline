@@ -1,0 +1,39 @@
+{
+  "titlePatterns": [
+    "Issue Information",
+    "Table of Contents",
+    "Editorial Board",
+    "Announcement",
+    "Call for Papers",
+    "Book Review",
+    "Books Received",
+    "Corrigendum",
+    "Erratum",
+    "Addendum",
+    "Retraction",
+    "Editorial",
+    "Preface",
+    "Foreword",
+    "Acknowledgment",
+    "In Memoriam",
+    "In Memory of",
+    "Editor's Note",
+    "Guest Editorial",
+    "Index",
+    "Supplement",
+    "Abstract"
+  ],
+  "subtypes": [
+    "editorial",
+    "letter",
+    "news",
+    "book-review",
+    "issue-information",
+    "front-matter",
+    "correction",
+    "retraction",
+    "commentary",
+    "obituary"
+  ],
+  "doiPrefixes": []
+}

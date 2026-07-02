@@ -1,3 +1,9 @@
+// Vercel API Function for literature radar update
+// 使用统一的 Crossref 客户端模块
+
+import { CrossrefClient } from "../lib/crossref-client.js";
+
+// 期刊配置（与 journals.json 保持一致）
 const JOURNALS = [
   ["child-development", "Child Development"],
   ["developmental-science", "Developmental Science"],
@@ -19,10 +25,28 @@ export default async function handler(request, response) {
 
   try {
     const from = new Date();
-    from.setDate(from.getDate() - 180); // 增加到 180 天
-    const candidates = await fetchCrossrefCandidates(from.toISOString().slice(0, 10));
+    const daysLookback = Number(process.env.CROSSREF_DAYS_LOOKBACK || 180);
+    from.setDate(from.getDate() - daysLookback);
 
-    // 添加调试信息
+    // 使用统一的 Crossref 客户端
+    const client = new CrossrefClient({
+      useIssn: process.env.CROSSREF_USE_ISSN !== "false",
+      hasAbstract: process.env.CROSSREF_HAS_ABSTRACT !== "false",
+      rows: Number(process.env.CROSSREF_ROWS_PER_JOURNAL || 100),
+      daysLookback
+    });
+
+    // 读取期刊配置（包含ISSN）
+    let journalsConfig;
+    try {
+      const journalsData = await fetchJson("https://raw.githubusercontent.com/[REPO]/main/data/journals.json");
+      journalsConfig = journalsData;
+    } catch (e) {
+      // 降级到内置列表
+      journalsConfig = JOURNALS.map(([id, name]) => ({ id, name }));
+    }
+
+    const candidates = await client.fetchPapers(journalsConfig);
     console.log(`[Update] Found ${candidates.length} candidates from Crossref`);
 
     const summarized = await summarizePapers(candidates);
@@ -30,117 +54,34 @@ export default async function handler(request, response) {
 
     response.status(200).json({
       message: saveResult.saved
-        ? `更新完成：新增/合并 ${summarized.length} 条候选记录（来自近 180 天），并已写回 GitHub。`
+        ? `更新完成：新增/合并 ${summarized.length} 条候选记录（来自近 ${daysLookback} 天），并已写回 GitHub。`
         : `更新完成：返回 ${summarized.length} 条候选记录。${saveResult.reason}`,
       papers: summarized,
       saved: saveResult.saved,
       saveResult,
       debug: {
         candidatesFound: candidates.length,
-        timeRange: "180 days"
+        timeRange: `${daysLookback} days`,
+        useIssn: client.useIssn,
+        hasAbstract: client.hasAbstract
       }
     });
   } catch (error) {
+    console.error("[Update] Error:", error);
     response.status(500).json({
       message: "更新函数运行失败。",
       error: error.message,
-      hint: "请检查 Vercel 环境变量 MODEL_API_KEY、MODEL_BASE_URL、MODEL_NAME、GITHUB_TOKEN、GITHUB_REPO、GITHUB_BRANCH，以及 GitHub token 的 Contents: Read and write 权限。"
+      hint: "请检查环境变量配置。"
     });
   }
 }
 
-async function fetchCrossrefCandidates(fromDate) {
-  const batches = await Promise.all(
-    JOURNALS.map(async ([journalId, journal]) => {
-      const url = new URL("https://api.crossref.org/works");
-      url.searchParams.set("query.container-title", journal);
-      url.searchParams.set("filter", `from-pub-date:${fromDate},type:journal-article`);
-      url.searchParams.set("sort", "published");
-      url.searchParams.set("order", "desc");
-      url.searchParams.set("rows", "100"); // 增加到 100 篇
-      url.searchParams.set("mailto", "private-literature-radar@example.com");
-
-      const result = await fetch(url);
-      if (!result.ok) {
-        console.error(`[Crossref] Failed to fetch ${journal}: HTTP ${result.status}`);
-        return [];
-      }
-      const payload = await result.json();
-      const items = payload.message?.items ?? [];
-      console.log(`[Crossref] ${journal}: API returned ${items.length} papers`);
-
-      const matched = items.filter((item) => matchesJournal(item, journal));
-      console.log(`[Crossref] ${journal}: ${matched.length} papers matched after filtering`);
-
-      return matched.map((item) => toPaper(item, journalId, journal));
-    })
-  );
-
-  const seen = new Set();
-  const deduped = batches
-    .flat()
-    .filter((paper) => {
-      const key = paper.doi || paper.id;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((a, b) => b.publishedDate.localeCompare(a.publishedDate));
-
-  console.log(`[Crossref] Total unique papers: ${deduped.length}`);
-  return deduped;
-}
-
-function matchesJournal(item, journal) {
-  const containerTitles = item["container-title"] ?? [];
-  const journalLower = journal.toLowerCase();
-
-  // 精确匹配
-  if (containerTitles.some((title) => title.toLowerCase() === journalLower)) {
-    return true;
+async function fetchJson(path) {
+  const response = await fetch(path);
+  if (!response.ok) {
+    throw new Error(`Cannot load ${path}`);
   }
-
-  // 模糊匹配：处理期刊名称可能有细微差异的情况
-  const journalWords = journalLower.split(/\s+/);
-  return containerTitles.some((title) => {
-    const titleLower = title.toLowerCase();
-    // 检查是否包含主要关键词
-    const matchCount = journalWords.filter((word) => word.length > 3 && titleLower.includes(word)).length;
-    return matchCount >= 2 || journalWords.some((w) => w.length > 8 && titleLower.includes(w));
-  });
-}
-
-function toPaper(item, journalId, journal) {
-  const doi = item.DOI ?? "";
-  const dateParts = item.published?.["date-parts"]?.[0] ?? item["published-print"]?.["date-parts"]?.[0] ?? item["published-online"]?.["date-parts"]?.[0] ?? [];
-  const publishedDate = [
-    String(dateParts[0] ?? "1900").padStart(4, "0"),
-    String(dateParts[1] ?? "01").padStart(2, "0"),
-    String(dateParts[2] ?? "01").padStart(2, "0")
-  ].join("-");
-
-  return {
-    id: doi ? `doi-${doi.toLowerCase().replaceAll("/", "-")}` : `crossref-${item.URL}`,
-    journalId,
-    journal,
-    title: stripTags(item.title?.[0] ?? "Untitled"),
-    authors: (item.author ?? []).map((author) => [author.given, author.family].filter(Boolean).join(" ")).filter(Boolean),
-    doi,
-    url: item.URL ?? (doi ? `https://doi.org/${doi}` : ""),
-    publishedDate,
-    topics: inferTopics(`${item.title?.[0] ?? ""} ${item.abstract ?? ""}`),
-    ageGroup: "待模型提取 / Pending model extraction",
-    paradigm: "待模型提取 / Pending model extraction",
-    methods: "待模型提取 / Pending model extraction",
-    researchQuestionZh: "待模型根据摘要提取。",
-    researchQuestionEn: "Pending extraction from the abstract.",
-    abstractZh: "待接入国内模型生成中文精简摘要。",
-    abstractEn: stripTags(item.abstract ?? "Abstract not available from Crossref."),
-    keyFindingsZh: "待模型提取核心发现。",
-    keyFindingsEn: "Pending key-finding extraction.",
-    status: "candidate",
-    source: "crossref"
-  };
+  return response.json();
 }
 
 async function summarizePapers(papers) {
@@ -382,18 +323,4 @@ function githubHeaders(token) {
     "user-agent": "literature-radar-dashboard",
     "x-github-api-version": "2022-11-28"
   };
-}
-
-function inferTopics(text) {
-  const lower = text.toLowerCase();
-  const topics = [];
-  if (/language|word|vocabulary|syntax|semantic|pragmatic|speech/.test(lower)) topics.push("儿童语言发展");
-  if (/vocabulary|word learning|lexical/.test(lower)) topics.push("词汇学习");
-  if (/semantic|pragmatic/.test(lower)) topics.push("语义语用学习");
-  if (/cognitive|memory|attention|executive/.test(lower)) topics.push("儿童认知发展");
-  return topics.length ? topics : ["待分类"];
-}
-
-function stripTags(value) {
-  return String(value).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }

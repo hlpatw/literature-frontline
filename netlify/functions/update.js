@@ -1,3 +1,9 @@
+// Netlify Function for literature radar update
+// 使用统一的 Crossref 客户端模块
+
+const { CrossrefClient } = require("../../lib/crossref-client.js");
+
+// 期刊配置（与 journals.json 保持一致）
 const JOURNALS = [
   ["child-development", "Child Development"],
   ["developmental-science", "Developmental Science"],
@@ -19,94 +25,72 @@ exports.handler = async function handler(event) {
     };
   }
 
-  const from = new Date();
-  from.setDate(from.getDate() - 90);
-  const candidates = await fetchCrossrefCandidates(from.toISOString().slice(0, 10));
-  const summarized = await summarizePapers(candidates);
-  const saveResult = await saveToGitHub(summarized);
+  try {
+    const from = new Date();
+    const daysLookback = Number(process.env.CROSSREF_DAYS_LOOKBACK || 90);
+    from.setDate(from.getDate() - daysLookback);
 
-  return {
-    statusCode: 200,
-    headers: { "content-type": "application/json; charset=utf-8" },
-    body: JSON.stringify({
-      message: saveResult.saved
-        ? `更新完成：新增/合并 ${summarized.length} 条候选记录，并已写回 GitHub。`
-        : `更新完成：返回 ${summarized.length} 条候选记录。${saveResult.reason}`,
-      papers: summarized,
-      saved: saveResult.saved,
-      saveResult
-    })
-  };
+    // 使用统一的 Crossref 客户端
+    const client = new CrossrefClient({
+      useIssn: process.env.CROSSREF_USE_ISSN !== "false",
+      hasAbstract: process.env.CROSSREF_HAS_ABSTRACT !== "false",
+      rows: Number(process.env.CROSSREF_ROWS_PER_JOURNAL || 50),
+      daysLookback
+    });
+
+    // 读取期刊配置（包含ISSN）
+    let journalsConfig;
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const journalsPath = path.join(__dirname, "..", "..", "data", "journals.json");
+      if (fs.existsSync(journalsPath)) {
+        const content = fs.readFileSync(journalsPath, "utf8");
+        journalsConfig = JSON.parse(content);
+      } else {
+        journalsConfig = JOURNALS.map(([id, name]) => ({ id, name }));
+      }
+    } catch (e) {
+      console.warn("[Netlify] Failed to load journals config, using fallback:", e.message);
+      journalsConfig = JOURNALS.map(([id, name]) => ({ id, name }));
+    }
+
+    const candidates = await client.fetchPapers(journalsConfig);
+    console.log(`[Update] Found ${candidates.length} candidates from Crossref`);
+
+    const summarized = await summarizePapers(candidates);
+    const saveResult = await saveToGitHub(summarized);
+
+    return {
+      statusCode: 200,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        message: saveResult.saved
+          ? `更新完成：新增/合并 ${summarized.length} 条候选记录（来自近 ${daysLookback} 天），并已写回 GitHub。`
+          : `更新完成：返回 ${summarized.length} 条候选记录。${saveResult.reason}`,
+        papers: summarized,
+        saved: saveResult.saved,
+        saveResult,
+        debug: {
+          candidatesFound: candidates.length,
+          timeRange: `${daysLookback} days`,
+          useIssn: client.useIssn,
+          hasAbstract: client.hasAbstract
+        }
+      })
+    };
+  } catch (error) {
+    console.error("[Update] Error:", error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: "更新函数运行失败。",
+        error: error.message,
+        hint: "请检查环境变量配置。"
+      })
+    };
+  }
 };
-
-async function fetchCrossrefCandidates(fromDate) {
-  const batches = await Promise.all(
-    JOURNALS.map(async ([journalId, journal]) => {
-      const url = new URL("https://api.crossref.org/works");
-      url.searchParams.set("query.container-title", journal);
-      url.searchParams.set("filter", `from-pub-date:${fromDate},type:journal-article`);
-      url.searchParams.set("sort", "published");
-      url.searchParams.set("order", "desc");
-      url.searchParams.set("rows", "20");
-      url.searchParams.set("mailto", "private-literature-radar@example.com");
-
-      const result = await fetch(url);
-      if (!result.ok) return [];
-      const payload = await result.json();
-      return (payload.message?.items ?? [])
-        .filter((item) => matchesJournal(item, journal))
-        .map((item) => toPaper(item, journalId, journal));
-    })
-  );
-
-  const seen = new Set();
-  return batches
-    .flat()
-    .filter((paper) => {
-      const key = paper.doi || paper.id;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((a, b) => b.publishedDate.localeCompare(a.publishedDate));
-}
-
-function matchesJournal(item, journal) {
-  return (item["container-title"] ?? []).some((title) => title.toLowerCase() === journal.toLowerCase());
-}
-
-function toPaper(item, journalId, journal) {
-  const doi = item.DOI ?? "";
-  const dateParts = item.published?.["date-parts"]?.[0] ?? item["published-print"]?.["date-parts"]?.[0] ?? item["published-online"]?.["date-parts"]?.[0] ?? [];
-  const publishedDate = [
-    String(dateParts[0] ?? "1900").padStart(4, "0"),
-    String(dateParts[1] ?? "01").padStart(2, "0"),
-    String(dateParts[2] ?? "01").padStart(2, "0")
-  ].join("-");
-
-  return {
-    id: doi ? `doi-${doi.toLowerCase().replaceAll("/", "-")}` : `crossref-${item.URL}`,
-    journalId,
-    journal,
-    title: stripTags(item.title?.[0] ?? "Untitled"),
-    authors: (item.author ?? []).map((author) => [author.given, author.family].filter(Boolean).join(" ")).filter(Boolean),
-    doi,
-    url: item.URL ?? (doi ? `https://doi.org/${doi}` : ""),
-    publishedDate,
-    topics: inferTopics(`${item.title?.[0] ?? ""} ${item.abstract ?? ""}`),
-    ageGroup: "待模型提取 / Pending model extraction",
-    paradigm: "待模型提取 / Pending model extraction",
-    methods: "待模型提取 / Pending model extraction",
-    researchQuestionZh: "待模型根据摘要提取。",
-    researchQuestionEn: "Pending extraction from the abstract.",
-    abstractZh: "待接入国内模型生成中文精简摘要。",
-    abstractEn: stripTags(item.abstract ?? "Abstract not available from Crossref."),
-    keyFindingsZh: "待模型提取核心发现。",
-    keyFindingsEn: "Pending key-finding extraction.",
-    status: "candidate",
-    source: "crossref"
-  };
-}
 
 async function summarizePapers(papers) {
   if (!process.env.MODEL_API_KEY || !process.env.MODEL_BASE_URL) {
@@ -347,18 +331,4 @@ function githubHeaders(token) {
     "user-agent": "literature-radar-dashboard",
     "x-github-api-version": "2022-11-28"
   };
-}
-
-function inferTopics(text) {
-  const lower = text.toLowerCase();
-  const topics = [];
-  if (/language|word|vocabulary|syntax|semantic|pragmatic|speech/.test(lower)) topics.push("儿童语言发展");
-  if (/vocabulary|word learning|lexical/.test(lower)) topics.push("词汇学习");
-  if (/semantic|pragmatic/.test(lower)) topics.push("语义语用学习");
-  if (/cognitive|memory|attention|executive/.test(lower)) topics.push("儿童认知发展");
-  return topics.length ? topics : ["待分类"];
-}
-
-function stripTags(value) {
-  return String(value).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
