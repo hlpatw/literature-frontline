@@ -2,36 +2,20 @@
 // 使用统一的 Crossref 客户端模块
 
 import { CrossrefClient } from "../lib/crossref-client.js";
-import { readFileSync } from "fs";
-import { pathToFileURL } from "url";
-import { join, dirname } from "path";
 
-// 获取当前文件的目录路径
-const __dirname = dirname(pathToFileURL(import.meta.url).pathname);
-
-// 读取期刊配置
-function loadJournalsConfig() {
-  try {
-    const journalsPath = join(__dirname, "..", "data", "journals.json");
-    const content = readFileSync(journalsPath, "utf8");
-    return JSON.parse(content);
-  } catch (e) {
-    console.warn("[API] Failed to load journals.json, using fallback:", e.message);
-    // 降级到内置列表
-    return [
-      { id: "child-development", name: "Child Development" },
-      { id: "developmental-science", name: "Developmental Science" },
-      { id: "developmental-psychology", name: "Developmental Psychology" },
-      { id: "jecp", name: "Journal of Experimental Child Psychology" },
-      { id: "infancy", name: "Infancy" },
-      { id: "journal-of-child-language", name: "Journal of Child Language" },
-      { id: "language-learning-development", name: "Language Learning and Development" },
-      { id: "journal-of-memory-and-language", name: "Journal of Memory and Language" },
-      { id: "applied-psycholinguistics", name: "Applied Psycholinguistics" },
-      { id: "first-language", name: "First Language" }
-    ];
-  }
-}
+// 期刊配置（包含ISSN）
+const JOURNALS_CONFIG = [
+  { id: "child-development", name: "Child Development", issn: ["0009-3920", "1467-8624"] },
+  { id: "developmental-science", name: "Developmental Science", issn: ["1363-755X", "1467-7684"] },
+  { id: "developmental-psychology", name: "Developmental Psychology", issn: ["0012-1649", "1939-0599"] },
+  { id: "jecp", name: "Journal of Experimental Child Psychology", issn: ["0022-0965", "1096-0457"] },
+  { id: "infancy", name: "Infancy", issn: ["1532-7078"] },
+  { id: "journal-of-child-language", name: "Journal of Child Language", issn: ["0305-0009"] },
+  { id: "language-learning-development", name: "Language Learning and Development", issn: ["1547-5441", "1547-3341"] },
+  { id: "journal-of-memory-and-language", name: "Journal of Memory and Language", issn: ["0749-596X", "1096-0821"] },
+  { id: "applied-psycholinguistics", name: "Applied Psycholinguistics", issn: ["0142-7164", "1469-1817"] },
+  { id: "first-language", name: "First Language", issn: ["0142-7237"] }
+];
 
 export default async function handler(request, response) {
   if (request.method !== "POST") {
@@ -53,7 +37,7 @@ export default async function handler(request, response) {
     });
 
     // 读取期刊配置（包含ISSN）
-    const journalsConfig = loadJournalsConfig();
+    const journalsConfig = JOURNALS_CONFIG;
     console.log("[API] Loaded journals config:", journalsConfig.length, "journals");
 
     const candidates = await client.fetchPapers(journalsConfig);
