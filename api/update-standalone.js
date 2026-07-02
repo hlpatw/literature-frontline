@@ -40,17 +40,12 @@ export default async function handler(request, response) {
     async function fetchJournal(journal) {
       const url = new URL("https://api.crossref.org/works");
 
-      // 先用期刊名称匹配（ISSN 方式可能有问题）
-      url.searchParams.set("query.container-title", journal.name);
+      // 先用最基本的参数测试
+      url.searchParams.set("query", journal.name);
+      url.searchParams.set("rows", "5");
 
-      url.searchParams.set("filter", `from-pub-date:${fromDate},type:journal-article`);
-      url.searchParams.set("sort", "published");
-      url.searchParams.set("order", "desc");
-      url.searchParams.set("rows", "20");
-      url.searchParams.set("select", "DOI,title,author,abstract,published,container-title,type,subtype");
-      url.searchParams.set("mailto", "literature-radar@example.com");
-
-      console.log(`[Crossref] Fetching ${journal.name}, URL: ${url}`);
+      console.log(`[Crossref] Fetching ${journal.name}`);
+      console.log(`[Crossref] URL: ${url}`);
 
       const result = await fetch(url);
 
