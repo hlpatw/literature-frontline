@@ -16,18 +16,13 @@ export default async function handler(request, response) {
     from.setDate(from.getDate() - daysLookback);
     const fromDate = from.toISOString().slice(0, 10);
 
-    // 期刊配置（内置ISSN）
+    // 期刊配置（内置ISSN）- 限制数量以避免超时
     const JOURNALS = [
       { id: "child-development", name: "Child Development", issn: ["0009-3920", "1467-8624"] },
       { id: "developmental-science", name: "Developmental Science", issn: ["1363-755X", "1467-7684"] },
       { id: "developmental-psychology", name: "Developmental Psychology", issn: ["0012-1649", "1939-0599"] },
       { id: "jecp", name: "Journal of Experimental Child Psychology", issn: ["0022-0965", "1096-0457"] },
-      { id: "infancy", name: "Infancy", issn: ["1532-7078"] },
-      { id: "journal-of-child-language", name: "Journal of Child Language", issn: ["0305-0009"] },
-      { id: "language-learning-development", name: "Language Learning and Development", issn: ["1547-5441", "1547-3341"] },
-      { id: "journal-of-memory-and-language", name: "Journal of Memory and Language", issn: ["0749-596X", "1096-0821"] },
-      { id: "applied-psycholinguistics", name: "Applied Psycholinguistics", issn: ["0142-7164", "1469-1817"] },
-      { id: "first-language", name: "First Language", issn: ["0142-7237"] }
+      { id: "infancy", name: "Infancy", issn: ["1532-7078"] }
     ];
 
     // 排除规则
@@ -131,13 +126,11 @@ export default async function handler(request, response) {
       return { journalName: journal.name, count: validItems.length, items: validItems };
     }
 
-    // 串行获取所有期刊以避免速率限制（减少延迟）
+    // 快速串行获取所有期刊（无延迟）
     const results = [];
     for (const journal of JOURNALS) {
       const result = await fetchJournal(journal);
       results.push(result);
-      // 每个请求之间延迟 1 秒
-      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     const batches = results.filter(r => !r.error).map(r => r.items);
@@ -160,7 +153,7 @@ export default async function handler(request, response) {
     // 调用模型生成摘要（限制数量以避免超时）
     let summarized = [];
     if (process.env.MODEL_API_KEY && process.env.MODEL_BASE_URL) {
-      const limit = Number(process.env.UPDATE_SUMMARY_LIMIT ?? 5);
+      const limit = Number(process.env.UPDATE_SUMMARY_LIMIT ?? 2);
       const selected = papers.slice(0, limit);
 
       for (const paper of selected) {
