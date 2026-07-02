@@ -2,20 +2,36 @@
 // 使用统一的 Crossref 客户端模块
 
 import { CrossrefClient } from "../lib/crossref-client.js";
+import { readFileSync } from "fs";
+import { pathToFileURL } from "url";
+import { join, dirname } from "path";
 
-// 期刊配置（与 journals.json 保持一致）
-const JOURNALS = [
-  ["child-development", "Child Development"],
-  ["developmental-science", "Developmental Science"],
-  ["developmental-psychology", "Developmental Psychology"],
-  ["jecp", "Journal of Experimental Child Psychology"],
-  ["infancy", "Infancy"],
-  ["journal-of-child-language", "Journal of Child Language"],
-  ["language-learning-development", "Language Learning and Development"],
-  ["journal-of-memory-and-language", "Journal of Memory and Language"],
-  ["applied-psycholinguistics", "Applied Psycholinguistics"],
-  ["first-language", "First Language"]
-];
+// 获取当前文件的目录路径
+const __dirname = dirname(pathToFileURL(import.meta.url).pathname);
+
+// 读取期刊配置
+function loadJournalsConfig() {
+  try {
+    const journalsPath = join(__dirname, "..", "data", "journals.json");
+    const content = readFileSync(journalsPath, "utf8");
+    return JSON.parse(content);
+  } catch (e) {
+    console.warn("[API] Failed to load journals.json, using fallback:", e.message);
+    // 降级到内置列表
+    return [
+      { id: "child-development", name: "Child Development" },
+      { id: "developmental-science", name: "Developmental Science" },
+      { id: "developmental-psychology", name: "Developmental Psychology" },
+      { id: "jecp", name: "Journal of Experimental Child Psychology" },
+      { id: "infancy", name: "Infancy" },
+      { id: "journal-of-child-language", name: "Journal of Child Language" },
+      { id: "language-learning-development", name: "Language Learning and Development" },
+      { id: "journal-of-memory-and-language", name: "Journal of Memory and Language" },
+      { id: "applied-psycholinguistics", name: "Applied Psycholinguistics" },
+      { id: "first-language", name: "First Language" }
+    ];
+  }
+}
 
 export default async function handler(request, response) {
   if (request.method !== "POST") {
@@ -37,14 +53,8 @@ export default async function handler(request, response) {
     });
 
     // 读取期刊配置（包含ISSN）
-    let journalsConfig;
-    try {
-      const journalsData = await fetchJson("https://raw.githubusercontent.com/[REPO]/main/data/journals.json");
-      journalsConfig = journalsData;
-    } catch (e) {
-      // 降级到内置列表
-      journalsConfig = JOURNALS.map(([id, name]) => ({ id, name }));
-    }
+    const journalsConfig = loadJournalsConfig();
+    console.log("[API] Loaded journals config:", journalsConfig.length, "journals");
 
     const candidates = await client.fetchPapers(journalsConfig);
     console.log(`[Update] Found ${candidates.length} candidates from Crossref`);
