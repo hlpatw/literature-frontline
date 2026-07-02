@@ -54,14 +54,18 @@ export default async function handler(request, response) {
       url.searchParams.set("select", "DOI,title,author,abstract,published,container-title,type,subtype");
       url.searchParams.set("mailto", "literature-radar@example.com");
 
+      console.log(`[Crossref] Fetching ${journal.name}, URL: ${url}`);
+
       const result = await fetch(url);
+
       if (!result.ok) {
         console.error(`[Crossref] ${journal.name}: HTTP ${result.status}`);
-        return [];
+        return { journalName: journal.name, error: `HTTP ${result.status}`, count: 0, items: [] };
       }
 
       const payload = await result.json();
       const items = payload.message?.items ?? [];
+      console.log(`[Crossref] ${journal.name}: Got ${items.length} items before filtering`);
 
       // 过滤非研究文章
       const validItems = items.filter(item => {
@@ -74,6 +78,10 @@ export default async function handler(request, response) {
         }
         return true;
       });
+
+      console.log(`[Crossref] ${journal.name}: Got ${validItems.length} items after filtering`);
+
+      return { journalName: journal.name, count: validItems.length, items: validItems };
 
       // 转换格式
       return validItems.map(item => {
@@ -99,7 +107,9 @@ export default async function handler(request, response) {
     }
 
     // 获取所有期刊
-    const batches = await Promise.all(JOURNALS.map(j => fetchJournal(j)));
+    const results = await Promise.all(JOURNALS.map(j => fetchJournal(j)));
+    const batches = results.filter(r => !r.error).map(r => r.items);
+    const errors = results.filter(r => r.error);
 
     // 去重
     const seen = new Set();
@@ -162,7 +172,16 @@ export default async function handler(request, response) {
       message: `更新完成：返回 ${allPapers.length} 条记录（其中 ${summarized.length} 条已生成摘要）`,
       papers: allPapers,
       saved: false,
-      debug: { candidatesFound: papers.length, daysLookback, fromDate }
+      debug: {
+        candidatesFound: papers.length,
+        daysLookback,
+        fromDate,
+        journalResults: results.map(r => ({
+          name: r.journalName || "unknown",
+          count: r.count,
+          error: r.error
+        }))
+      }
     });
 
   } catch (error) {
