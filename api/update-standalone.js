@@ -47,7 +47,14 @@ export default async function handler(request, response) {
       console.log(`[Crossref] Fetching ${journal.name}`);
       console.log(`[Crossref] URL: ${url}`);
 
-      const result = await fetch(url);
+      let result = await fetch(url);
+
+      // 如果遇到 429 错误，等待后重试
+      if (result.status === 429) {
+        console.warn(`[Crossref] ${journal.name}: Rate limited, waiting 3 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        result = await fetch(url);
+      }
 
       if (!result.ok) {
         console.error(`[Crossref] ${journal.name}: HTTP ${result.status}`);
@@ -97,8 +104,14 @@ export default async function handler(request, response) {
       });
     }
 
-    // 获取所有期刊
-    const results = await Promise.all(JOURNALS.map(j => fetchJournal(j)));
+    // 获取所有期刊 - 串行执行以避免速率限制
+    const results = [];
+    for (const journal of JOURNALS) {
+      const result = await fetchJournal(journal);
+      results.push(result);
+      // 每个请求之间延迟 1 秒
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
     const batches = results.filter(r => !r.error).map(r => r.items);
     const errors = results.filter(r => r.error);
 
