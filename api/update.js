@@ -54,17 +54,15 @@ export default async function handler(request, response) {
 
     // 获取单个期刊的文献
     async function fetchJournal(journal) {
+      // Crossref 的 filter 参数不支持多个 ISSN 的 OR 逻辑
+      // 使用第一个 ISSN（通常是印刷版），然后验证容器标题
+      const primaryIssn = journal.issn && journal.issn.length > 0 ? journal.issn[0] : null;
+
       const url = new URL("https://api.crossref.org/works");
 
-      // 使用 ISSN 精确过滤（如果有）
-      if (journal.issn && journal.issn.length > 0) {
-        // 使用 filter 参数进行 ISSN 精确匹配
-        // Crossref 支持 ISSN:XXXX-XXXX 格式
-        const filters = [`from-pub-date:${fromDate}`];
-        journal.issn.forEach(issn => {
-          filters.push(`issn:${issn}`);
-        });
-        url.searchParams.set("filter", filters.join(","));
+      // 使用 ISSN 精确过滤
+      if (primaryIssn) {
+        url.searchParams.set("filter", `issn:${primaryIssn},from-pub-date:${fromDate}`);
       } else {
         // 降级到期刊名称查询
         url.searchParams.set("query", journal.name);
@@ -75,8 +73,7 @@ export default async function handler(request, response) {
       url.searchParams.set("sort", "published");
       url.searchParams.set("order", "desc");
 
-      console.log(`[Crossref] Fetching ${journal.name} with ISSN filter...`);
-      console.log(`[Crossref] URL: ${url}`);
+      console.log(`[Crossref] Fetching ${journal.name} with ISSN: ${primaryIssn || 'none'}`);
 
       let result = await fetch(url);
 
