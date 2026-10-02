@@ -1,6 +1,7 @@
 # Psycholinguistics Literature Radar
 
 私人文献雷达 dashboard，用于追踪儿童语言发展、儿童认知发展、词汇学习、语义/语用学习相关顶刊文章。
+我的vibe coding初尝试，有很多不足的地方，进阶版请见Litradar项目
 
 ## 当前功能
 
